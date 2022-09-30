@@ -1,0 +1,113 @@
+var CONFIG = {
+      LABEL_NAME: 'Tracking Link Check UTM',
+      SUFFIX: 'utm_source=google&utm_medium=cpc&utm_campaign={_campaign}|{campaignid}&utm_term={feeditemid}{keyword}&utm_content={_adgroup}|{adgroupid}&utm_id={campaignid}'
+      // ALTERNATE MTM SUFFIX
+      // mtm_source=google&mtm_medium=cpc&mtm_campaign={_Campaign}|{campaignid}&mtm_keyword={feeditemid}{keyword}&mtm_content={_Adgroup}|{adgroupid}
+}
+
+function main() {
+  const accountSelector = AdsManagerApp.accounts()
+      .withCondition("LabelNames CONTAINS '" + CONFIG.LABEL_NAME + "'")
+      .withLimit(50);
+  accountSelector.executeInParallel('processAccount', 'allFinished');
+
+ }
+
+function processAccount() {
+    campaignParametersUpdate()
+    adgroupParametersUpdate()
+}
+
+function campaignParametersUpdate(account){
+  var campaignSelector = AdsApp
+     .campaigns()
+     .withCondition("campaign.status IN ('ENABLED','PAUSED')")
+   var campaignIterator = campaignSelector.get();
+   while (campaignIterator.hasNext()) {
+      var campaign = campaignIterator.next();
+      var name = campaign.getName();
+      name = encodeURI(name)
+      //Logger.log(name)
+     var params = campaign.urls().getCustomParameters()
+     //Logger.log(params.campaign + ' = ' + name)
+     if(params.campaign != name){
+       params.campaign = name;
+       campaign.urls().setCustomParameters(params)
+     }
+     if(campaign.urls().getFinalUrlSuffix() != CONFIG.SUFFIX){
+       campaign.urls().setFinalUrlSuffix(CONFIG.SUFFIX)     
+     }
+ }
+}
+
+function adgroupParametersUpdate(){
+  var adGroupSelector = AdsApp
+     .adGroups()
+     .withCondition("campaign.status IN ('ENABLED','PAUSED')")
+   var adGroupIterator  = adGroupSelector.get();
+   while (adGroupIterator.hasNext()) {
+      var adgroup = adGroupIterator.next();
+      var name = adgroup.getName();
+      name = encodeURI(name)
+      //Logger.log(name)
+     var params = adgroup.urls().getCustomParameters()
+     if(params.adgroup != name){
+       params.adgroup = name;
+       //Logger.log(params)
+       adgroup.urls().setCustomParameters(params)
+     }
+ }
+}
+
+
+function updateAccountsInParallel() {
+  // You can use this approach when you have a large amount of processing
+  // to do in each of your client accounts.
+
+  // Select the accounts to be processed. You can process up to 50 accounts.
+  const accountSelector = AdsManagerApp.accounts()
+      .withCondition("LabelNames CONTAINS 'High spend accounts'")
+      .withLimit(50);
+
+  // Process the account in parallel. The 'processAccount' function will
+  // be called in the context of each account in the selector. The 'allFinished' function
+  // will be called in this script once processing is complete, and is optional.
+  accountSelector.executeInParallel('processAccount', 'allFinished');
+}
+
+/**
+ * Process one account at a time. This method is called by the executeInParallel
+ * method call in updateAccountsInParallel function for every account that
+ * it processes.
+ *
+ * @return {Number} the number of campaigns paused by this method.
+ */
+
+
+/**
+ * Post-process the results from processAccount. This method will be called
+ * once all the accounts have been processed by the executeInParallel method
+ * call.
+ *
+ * @param {Array.<ExecutionResult>} results An array of ExecutionResult objects,
+ * one for each account that was processed by the executeInParallel method.
+ */
+function allFinished(results) {
+  for (const result of results) {
+    /*console.log(`Customer ID: ${result.getCustomerId}; ` +
+        `status = ${result.getStatus}.`);
+    */
+    // Check the execution status. This can be one of ERROR, OK, or TIMEOUT.
+    if (result.getStatus() == 'ERROR') {
+      console.log(`-- Failed with error: '${result.getError()}'.`);
+    } else if (result.getStatus() == 'OK') {
+      // This is the value you returned from processAccount method. If you
+      // used JSON.stringify(value) in processAccount, you can use
+      // JSON.parse(text) to reconstruct the JavaScript object.
+      const retval = result.getReturnValue();
+      console.log(`--Processed ${retval} campaigns.`);
+    } else {
+      // Handle timeouts here.
+    }
+  }
+}
